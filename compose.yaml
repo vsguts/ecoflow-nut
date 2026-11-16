@@ -1,0 +1,16 @@
+services:
+  nut:
+    build: .
+    env_file: .env
+    volumes:
+      # The wake file: shared by the server and `python -m ecoflow_nut.wake`.
+      - ./data:/app/data
+    # Keep the host port and NUT_PORT in step (DSM always uses 3493).
+    ports:
+      - "3493:3493"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
