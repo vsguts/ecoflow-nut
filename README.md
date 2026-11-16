@@ -27,8 +27,10 @@ station's own low battery.
 Before the first reading the server answers `ERR DATA-STALE`; it reads the station once before it starts to
 listen.
 
-A NUT client counts a UPS it cannot reach for about 15 s while on battery as critical. With the station on AC
-input, restarting this server is harmless; while it runs on battery, a restart sends the NAS to Safe Mode.
+A NUT client that loses the UPS while it was last on battery assumes the worst at once: "last known to be on
+battery and is unavailable - assuming critical". One failed poll is enough, and DSM polls every few seconds, so even
+a 5-second restart can send the NAS to Safe Mode. With the station on AC input a restart is harmless: the last known
+status is on line.
 
 ## Wake
 
@@ -68,7 +70,7 @@ on battery.
 3. `docker compose up -d --build`.
 4. Check from any machine: `upsc ups@<host>`.
 5. DSM > Control Panel > Hardware & Power > UPS: enable UPS support, type "Synology UPS server", server IP = the
-   host, "Time before Synology NAS enters Standby Mode": "Until low battery". Device Information should show
+   host, "Time before Synology NAS enters Standby Mode": "Same as server" (the low battery this server reports). Device Information should show
    EcoFlow RIVER 2 Max with its charge.
 
 The server only reads: anyone who can reach the port sees the station's state, nobody can change anything. Who
