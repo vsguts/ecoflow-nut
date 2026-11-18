@@ -5,6 +5,8 @@ services:
     volumes:
       # The wake file: shared by the server and `python -m ecoflow_nut.wake`.
       - ./data:/app/data
+      # bleak talks to the host's BlueZ over the system D-Bus.
+      - /run/dbus:/run/dbus:ro
     # Keep the host port and NUT_PORT in step (DSM always uses 3493).
     ports:
       - "3493:3493"

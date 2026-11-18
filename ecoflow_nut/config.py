@@ -2,7 +2,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from ecoflow_nut.ecoflow_api import DEFAULT_API_URL, EcoFlowConfig
 from ecoflow_nut.nut_server import DEFAULT_PORT, UpsConfig
 from ecoflow_nut.ups import Battery
 from ecoflow_nut.wake import DEFAULT_WAKE_FILE
@@ -13,12 +12,17 @@ class ConfigError(ValueError):
 
 
 @dataclass(frozen=True)
+class StationConfig:
+    serial: str
+    user_id: str
+
+
+@dataclass(frozen=True)
 class Settings:
-    ecoflow: EcoFlowConfig
+    station: StationConfig
     nut: UpsConfig
     battery: Battery
     model: str
-    poll_interval: float
     wake_file: Path
 
 
@@ -42,11 +46,9 @@ def _number(env: Mapping[str, str], name: str, default: str, *, low: float, high
 
 def settings_from_env(env: Mapping[str, str]) -> Settings:
     return Settings(
-        ecoflow=EcoFlowConfig(
-            access_key=_required(env, "ECOFLOW_ACCESS_KEY"),
-            secret_key=_required(env, "ECOFLOW_SECRET_KEY"),
+        station=StationConfig(
             serial=_required(env, "ECOFLOW_SERIAL"),
-            api_url=env.get("ECOFLOW_API_URL", "").strip() or DEFAULT_API_URL,
+            user_id=_required(env, "ECOFLOW_USER_ID"),
         ),
         nut=UpsConfig(
             port=int(_number(env, "NUT_PORT", str(DEFAULT_PORT), low=1, high=65535)),
@@ -59,7 +61,5 @@ def settings_from_env(env: Mapping[str, str]) -> Settings:
             capacity_wh=_number(env, "BATTERY_CAPACITY_WH", "512", low=1, high=100_000),
         ),
         model=env.get("STATION_MODEL", "").strip() or "RIVER 2 Max",
-        # Each poll is two API calls (device list, quota); 30 s keeps well inside the cloud's limits.
-        poll_interval=_number(env, "POLL_INTERVAL", "30", low=5, high=300),
         wake_file=Path(env.get("WAKE_FILE", "").strip() or DEFAULT_WAKE_FILE),
     )

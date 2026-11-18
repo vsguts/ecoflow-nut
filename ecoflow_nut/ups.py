@@ -8,7 +8,7 @@ from ecoflow_nut.station import Reading
 from ecoflow_nut.wake import WakeFile
 
 MFR = "EcoFlow"
-# Several missed polls in a row: the station is offline or the cloud unreachable, not just slow once.
+# Well past a reconnect: the station, the adapter or the link is gone, not just slow once.
 READING_LOST_AFTER = timedelta(minutes=2)
 # A reading lost this close to the threshold leaves too little to wait for.
 LOST_NEAR_LOW = 2
@@ -93,8 +93,8 @@ class StationUps:
         # Only a plain "on battery" is masked: a low battery always reaches the NAS.
         return "OL" if self._wake.active(now) else "OB"
 
-    # Without readings the station may have lost its AC input at the same moment (a dead router takes the cloud
-    # with it): assume it runs the whole output from the battery since the last reading.
+    # Without readings nothing says the AC input is still there (a power cut can take the host's adapter down with
+    # it): assume the station runs the whole output from the battery since the last reading.
     def _lost_low(self, reading: Reading, now: datetime) -> bool:
         low_soc = self._battery.low_soc
         if not reading.on_line and reading.soc <= low_soc + LOST_NEAR_LOW:

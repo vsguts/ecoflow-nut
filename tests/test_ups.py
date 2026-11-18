@@ -95,7 +95,7 @@ def test_lost_readings_near_the_threshold_report_a_low_battery(tmp_path):
 
 
 def test_lost_readings_assume_the_battery_carries_the_output(tmp_path):
-    # The router may die with the AC input and take the cloud along: from 80 % at 40 W, 512 Wh reach 15 % in
+    # A power cut may take the host's adapter down with the AC input: from 80 % at 40 W, 512 Wh reach 15 % in
     # 65 % × 512 / 40 = 8.32 h, even if the last reading was on line.
     clock = Clock(at(0))
     ups = make_ups(tmp_path, clock)
