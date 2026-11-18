@@ -18,6 +18,9 @@ log = logging.getLogger(__name__)
 STALL_AFTER = timedelta(minutes=1)
 RETRY_DELAY = timedelta(seconds=20)
 WATCH_STEP = timedelta(seconds=5)
+# The station reports several times a second, but StationUps counts readings: it wants a low charge confirmed by
+# readings some time apart, not by two packets of the same second.
+READING_EVERY = timedelta(seconds=10)
 
 
 def _utc_now() -> datetime:
@@ -48,6 +51,7 @@ class StationLink:
         self._clock = clock
         self._retry_delay = retry_delay
         self._last_update = clock()
+        self._last_reading: datetime | None = None
         self._last_error: str | None = None
         self.first_reading = asyncio.Event()
 
@@ -76,10 +80,13 @@ class StationLink:
     def _publish(self, state: StationState) -> None:
         now = self._clock()
         self._last_update = now
+        if self._last_reading is not None and now - self._last_reading < READING_EVERY:
+            return
         try:
             reading = read_state(state, now)
         except InvalidReading:
             return  # Right after connecting, until every part of the station has reported once.
+        self._last_reading = now
         self._on_reading(reading)
         self.first_reading.set()
 

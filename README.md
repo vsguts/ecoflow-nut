@@ -16,7 +16,8 @@ info", code 1006). The model is missing from its list of supported devices.
 - `ups.status`:
   - `OL` while the station has AC input, `OL CHRG` while it also charges;
   - `OB` without AC input;
-  - `OB LB` once the charge has stayed at or below `LOW_SOC` for two readings in a row. It holds until the
+  - `OB LB` once the charge has stayed at or below `LOW_SOC` for two readings in a row (one reading every
+    10 seconds). It holds until the
     charge is 2 points above the threshold, or the AC input is back.
 - No reading for 2 minutes (the Bluetooth link lost, the adapter or the station gone): the last status holds,
   but it turns into `OB LB`

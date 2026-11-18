@@ -65,6 +65,27 @@ async def test_reports_become_readings_once_the_station_has_reported_everything(
     assert fake.close_calls == 1
 
 
+async def test_readings_come_at_most_every_ten_seconds():
+    clock = Clock()
+    fake = FakeLink(**GOOD)
+
+    async def connect():
+        return fake
+
+    station_link, readings = make(connect, clock)
+    session = asyncio.create_task(station_link.session())
+    await asyncio.sleep(0)
+    fake.report()
+    clock.now += timedelta(seconds=9)
+    fake.report(battery_level=60)
+    clock.now += timedelta(seconds=1)
+    fake.report(battery_level=50)
+    assert [r.soc for r in readings] == [70, 50]
+    fake.closed.set()
+    await session
+    assert fake.close_calls == 1
+
+
 async def test_a_quiet_link_is_dropped(monkeypatch):
     monkeypatch.setattr(link_module, "WATCH_STEP", timedelta(0))
     clock = Clock()
