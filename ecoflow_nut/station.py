@@ -1,23 +1,25 @@
-"""One reading of the station from the EcoFlow cloud quota.
+"""One reading of the station: what the NUT side needs from the values the station reports over Bluetooth."""
 
-The field names follow EcoFlow's RIVER 2 series documentation and are provisional until checked against a real
-dump of this station (tools/dump_quota.py); AC input voltage is in mV, as on the DELTA Pro.
-"""
-
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Protocol
 
-SOC = "pd.soc"
-AC_IN_MILLIVOLTS = "inv.acInVol"
-INPUT_W = "pd.wattsInSum"
-OUTPUT_W = "pd.wattsOutSum"
 # Without AC input the station reports about 0 V; anything it can charge from is far above this.
 MIN_AC_VOLTAGE = 180.0
+MILLIVOLTS_PER_VOLT = 1000
 
 
-class InvalidQuota(ValueError):
+class InvalidReading(ValueError):
     pass
+
+
+class StationState(Protocol):
+    """The fields of a connected station (eflib names); None until the station has reported them."""
+
+    battery_level: float | None
+    ac_input_voltage: int | None  # mV
+    input_power: int | None
+    output_power: int | None
 
 
 @dataclass(frozen=True)
@@ -38,21 +40,21 @@ class Reading:
         return max(self.output_w - self.input_w, 0)
 
 
-def _number(quota: Mapping[str, object], key: str) -> int | float:
-    value = quota.get(key)
+def _number(state: StationState, name: str) -> int | float:
+    value = getattr(state, name, None)
     if isinstance(value, bool) or not isinstance(value, int | float):
-        raise InvalidQuota(f"{key} is missing or not a number: {value!r}")
+        raise InvalidReading(f"{name} is missing or not a number: {value!r}")
     return value
 
 
-def decode_quota(quota: Mapping[str, object], taken_at: datetime) -> Reading:
-    soc = int(_number(quota, SOC))
+def read_state(state: StationState, taken_at: datetime) -> Reading:
+    soc = round(_number(state, "battery_level"))
     if not 0 <= soc <= 100:
-        raise InvalidQuota(f"implausible SOC {soc}%")
+        raise InvalidReading(f"implausible SOC {soc}%")
     return Reading(
         taken_at=taken_at,
         soc=soc,
-        input_v=_number(quota, AC_IN_MILLIVOLTS) / 1000,
-        input_w=int(_number(quota, INPUT_W)),
-        output_w=int(_number(quota, OUTPUT_W)),
+        input_v=_number(state, "ac_input_voltage") / MILLIVOLTS_PER_VOLT,
+        input_w=int(_number(state, "input_power")),
+        output_w=int(_number(state, "output_power")),
     )

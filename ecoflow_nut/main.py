@@ -2,55 +2,31 @@ import asyncio
 import logging
 import os
 import sys
-from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import timedelta
 
-from ecoflow_nut.client import StationClient
+from ecoflow_nut.ble import connector
 from ecoflow_nut.config import ConfigError, Settings, settings_from_env
-from ecoflow_nut.ecoflow_api import EcoFlowError
+from ecoflow_nut.link import StationLink
 from ecoflow_nut.nut_server import NutServer
-from ecoflow_nut.station import Reading
 from ecoflow_nut.ups import StationUps
 from ecoflow_nut.wake import WakeFile
 
 log = logging.getLogger(__name__)
 
-Read = Callable[[datetime], Awaitable[Reading]]
-
-
-async def poll_once(read: Read, ups: StationUps, failing: bool) -> bool:
-    """Returns whether the station is failing now; logs only the changes, not every failed poll."""
-    try:
-        reading = await read(datetime.now(UTC))
-    except EcoFlowError as exc:
-        if not failing:
-            log.warning("No reading, keeping the last one: %s", exc)
-        return True
-    if failing:
-        log.info("Readings are back")
-    ups.update(reading)
-    return False
-
-
-async def poll(read: Read, ups: StationUps, interval: float) -> None:
-    failing = False
-    while True:
-        failing = await poll_once(read, ups, failing)
-        await asyncio.sleep(interval)
+# Scan, handshake and the first report of every part of the station take about 10 s.
+FIRST_READING_WAIT = timedelta(minutes=1)
 
 
 async def run(settings: Settings) -> None:
-    client = StationClient(settings.ecoflow)
     ups = StationUps(settings.model, settings.battery, WakeFile(settings.wake_file))
+    link = StationLink(connector(settings.station.serial, settings.station.user_id), ups.update)
+    linking = asyncio.create_task(link.run())
     # The first reading comes before the server listens: DSM never sees a UPS without data after a restart.
-    await poll_once(client.read, ups, failing=False)
     try:
-        await asyncio.gather(
-            poll(client.read, ups, settings.poll_interval),
-            NutServer(settings.nut, ups.variables).run(),
-        )
-    finally:
-        await client.close()
+        await asyncio.wait_for(link.first_reading.wait(), FIRST_READING_WAIT.total_seconds())
+    except TimeoutError:
+        log.warning("No reading yet; serving without data until the station reports")
+    await asyncio.gather(linking, NutServer(settings.nut, ups.variables).run())
 
 
 def main() -> None:

@@ -1,9 +1,10 @@
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY ecoflow_nut ./ecoflow_nut
 COPY tools ./tools
+RUN python tools/fetch_eflib.py /app
+COPY ecoflow_nut ./ecoflow_nut
 CMD ["python", "-m", "ecoflow_nut.main"]
